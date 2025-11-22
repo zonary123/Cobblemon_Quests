@@ -5,6 +5,15 @@
   "version": "${mod_version}",
   "description": "${mod_description}",
   "authors": ["WinterWolfSV"],
+  "contributors": [
+    {
+      "name": "zonary123",
+      "contact": {
+        "role": "contributor",
+        "homepage": "https://github.com/zonary123"
+      }
+    }
+  ],
   "contact": {"repo": "${repository}"},
   "license": "${license}",
   "icon": "${mod_icon}",
