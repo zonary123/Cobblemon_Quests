@@ -53,7 +53,7 @@ public class CobblemonQuestsEventHandler {
         CobblemonEvents.EVOLUTION_COMPLETE.subscribe(Priority.LOWEST, this::pokemonEvolutionComplete);
         CobblemonEvents.LEVEL_UP_EVENT.subscribe(Priority.LOWEST, this::pokemonLevelUp);
         CobblemonEvents.EVOLUTION_ACCEPTED.subscribe(Priority.LOWEST, this::pokemonEvolutionAccepted);
-        CobblemonEvents.TRADE_COMPLETED.subscribe(Priority.LOWEST, this::pokemonTrade);
+        CobblemonEvents.TRADE_EVENT_POST.subscribe(Priority.LOWEST, this::pokemonTrade);
         CobblemonEvents.POKEMON_RELEASED_EVENT_PRE.subscribe(Priority.LOWEST, this::pokemonRelease);
         CobblemonEvents.FOSSIL_REVIVED.subscribe(Priority.LOWEST, this::fossilRevived);
         CobblemonEvents.BOBBER_SPAWN_POKEMON_POST.subscribe(Priority.LOWEST, this::pokemonBobberSpawn);
@@ -82,20 +82,20 @@ public class CobblemonQuestsEventHandler {
         triggerPokeDexUpdate(player.getUUID());
     }
 
-    private Unit pokeDexChanged(PokedexDataChangedEvent.Pre pre) {
+    private void pokeDexChanged(PokedexDataChangedEvent evt) {
         // 0: encountered
         // 1: caught after encounter
         // 2: caught without encounter
         try {
-            Pokemon pokemon = pre.getDataSource().getPokemon();
-            PokedexEntryProgress before = pre.getPokedexManager().getKnowledgeForSpecies(pokemon.getSpecies().getResourceIdentifier());
-            PokedexEntryProgress after = pre.getKnowledge();
+            Pokemon pokemon = evt.getDataSource().getPokemon();
+            PokedexEntryProgress before = evt.getPokedexManager().getKnowledgeForSpecies(pokemon.getSpecies().getResourceIdentifier());
+            PokedexEntryProgress after = evt.getKnowledge();
             int value = after.equals(PokedexEntryProgress.CAUGHT)
                     ? (before.equals(PokedexEntryProgress.ENCOUNTERED) ? 1 : 2)
                     : after.equals(PokedexEntryProgress.ENCOUNTERED) ? 0 : -1;
             if (value == -1)
                 throw new Exception("Invalid pokedex change.", new Throwable("Before: " + before + " After: " + after));
-            LivingEntity owner = pre.getDataSource().getPokemon().getOwnerEntity();
+            LivingEntity owner = evt.getDataSource().getPokemon().getOwnerEntity();
             PokemonEntity pokemonEntity = pokemon.getEntity();
             Level world = Optional.ofNullable(owner)
                     .map(LivingEntity::level)
@@ -104,42 +104,38 @@ public class CobblemonQuestsEventHandler {
                             .orElse(null));
 
             if (world == null) {
-                Throwable cause = new Throwable("Owner uuid " + pre.getPlayerUUID() + "Owner: " + owner + " PokemonEntity: " + pokemonEntity);
+                Throwable cause = new Throwable("Owner uuid " + evt.getPlayerUUID() + "Owner: " + owner + " PokemonEntity: " + pokemonEntity);
                 throw new NoSuchElementException("World is null while processing pokedex.", cause);
             }
 
-            Player player = world.getPlayerByUUID(pre.getPlayerUUID());
+            Player player = world.getPlayerByUUID(evt.getPlayerUUID());
             if (player instanceof ServerPlayer serverPlayer) {
                 processTasksForTeam(pokemon, "register", value, serverPlayer);
             }
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing pokedex changed event " + e.getCause() + " " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
     }
 
-    private Unit pokeDexChanged(PokedexDataChangedEvent.Post post) {
-        triggerPokeDexUpdate(post.getPlayerUUID());
-        return Unit.INSTANCE;
-    }
 
-    private Unit pokemonScan(PokemonScannedEvent pokemonScannedEvent) {
+
+    private void pokemonScan(PokemonScannedEvent pokemonScannedEvent) {
         try {
             if (!(pokemonScannedEvent.getScannedEntity().resolveEntityScan() instanceof PokemonEntity)) {
-                return Unit.INSTANCE;
+                return ;
             }
             Pokemon pokemon = ((PokemonEntity) pokemonScannedEvent.getScannedEntity()).getPokemon();
-            if (lastPokemonUuid == pokemon.getUuid()) return Unit.INSTANCE;
+            if (lastPokemonUuid == pokemon.getUuid()) return ;
             lastPokemonUuid = pokemon.getUuid();
             ServerPlayer player = pokemonScannedEvent.getPlayer();
             processTasksForTeam(pokemon, "scan", 1, player);
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing scan event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
-    private Unit pokemonBobberSpawn(BobberSpawnPokemonEvent.Post post) {
+    private void pokemonBobberSpawn(BobberSpawnPokemonEvent.Post post) {
         try {
             Pokemon pokemon = post.getPokemon().getPokemon();
             ServerPlayer player = (ServerPlayer) post.component1().getPlayerOwner();
@@ -147,10 +143,10 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing bobber spawn event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
-    private Unit fossilRevived(FossilRevivedEvent fossilRevivedEvent) {
+    private void fossilRevived(FossilRevivedEvent fossilRevivedEvent) {
         try {
             ServerPlayer player = fossilRevivedEvent.getPlayer();
             Pokemon pokemon = fossilRevivedEvent.getPokemon();
@@ -158,7 +154,7 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing fossil revive event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
     private void fileCacheClear(QuestFile file) {
@@ -167,7 +163,7 @@ public class CobblemonQuestsEventHandler {
         }
     }
 
-    private Unit pokemonRelease(ReleasePokemonEvent.Pre pre) {
+    private void pokemonRelease(ReleasePokemonEvent.Pre pre) {
         try {
             ServerPlayer player = pre.getPlayer();
             Pokemon pokemon = pre.getPokemon();
@@ -175,14 +171,14 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing release event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
     /**
      * Player 1 gives pokemon 1 to player 2
      * Player 2 gives pokemon 2 to player 1
      */
-    private Unit pokemonTrade(TradeCompletedEvent tradeCompletedEvent) {
+    private void pokemonTrade(TradeEvent tradeCompletedEvent) {
         try {
             Pokemon pokemonGivenByPlayer1 = tradeCompletedEvent.getTradeParticipant2Pokemon();
             Pokemon pokemonGivenByPlayer2 = tradeCompletedEvent.getTradeParticipant1Pokemon();
@@ -195,14 +191,14 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing trade event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
-    private Unit pokemonBattleVictory(BattleVictoryEvent battleVictoryEvent) {
+    private void pokemonBattleVictory(BattleVictoryEvent battleVictoryEvent) {
         try {
             List<ServerPlayer> players = battleVictoryEvent.getBattle().getPlayers();
             if (players.isEmpty())
-                return Unit.INSTANCE; // Not sure why no players would be in the battle, but better safe than sorry
+                return; // Not sure why no players would be in the battle, but better safe than sorry
             if (players.size() == 2) {
                 ServerPlayer player1 = players.get(0);
                 ServerPlayer player2 = players.get(1);
@@ -213,7 +209,7 @@ public class CobblemonQuestsEventHandler {
                 }
             }
             ServerPlayer player = players.getFirst();
-            if (!player.getUUID().equals(battleVictoryEvent.getWinners().getFirst().getUuid())) return Unit.INSTANCE;
+            if (!player.getUUID().equals(battleVictoryEvent.getWinners().getFirst().getUuid())) return;
             for (BattleActor actor : battleVictoryEvent.getBattle().getActors()) {
                 if (actor.getType() == ActorType.NPC) {
                     processTasksForTeam(actor.getName().getString(), "defeat_npc", 1, player);
@@ -223,7 +219,7 @@ public class CobblemonQuestsEventHandler {
                     // Checks if the Pokémon is the last Pokémon that was caught. Done to bypass an issue with two events being
                     // fired for the same Pokémon and adding progress to catch and defeat tasks.
                     if (actor.getPokemonList().getFirst().getEffectedPokemon().getUuid() == lastPokemonUuid)
-                        return Unit.INSTANCE;
+                        return;
                     processTasksForTeam(actor.getPokemonList().getFirst().getEffectedPokemon(), "defeat", 1, player);
                     break;
                 }
@@ -231,15 +227,15 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing battle victory event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
-    private Unit pokemonCatch(PokemonCapturedEvent pokemonCapturedEvent) {
+    private void pokemonCatch(PokemonCapturedEvent pokemonCapturedEvent) {
         lastPokemonUuid = pokemonCapturedEvent.getPokemon().getUuid();
-        return pokemonCatch(pokemonCapturedEvent.getPokemon(), pokemonCapturedEvent.getPlayer());
+        processPokemonCatch(pokemonCapturedEvent.getPokemon(), pokemonCapturedEvent.getPlayer());
     }
 
-    private Unit pokeballHit(ThrownPokeballHitEvent thrownPokeballHitEvent) {
+    private void pokeballHit(ThrownPokeballHitEvent thrownPokeballHitEvent) {
         try {
             Entity ballOwner = thrownPokeballHitEvent.getPokeBall().getOwner();
             if (ballOwner instanceof ServerPlayer player) {
@@ -250,7 +246,7 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing pokéball hit event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
     private EventResult entityKill(Entity livingEntity, DamageSource damageSource) {
@@ -266,7 +262,7 @@ public class CobblemonQuestsEventHandler {
         return EventResult.pass();
     }
 
-    public Unit pokemonCatch(Pokemon pokemon, ServerPlayer player) {
+    public Unit processPokemonCatch(Pokemon pokemon, ServerPlayer player) {
         try {
             processTasksForTeam(pokemon, "catch", 1, player);
         } catch (Exception e) {
@@ -275,31 +271,29 @@ public class CobblemonQuestsEventHandler {
         return Unit.INSTANCE;
     }
 
-    private Unit pokemonStarterChosen(StarterChosenEvent starterChosenEvent) {
+    private void pokemonStarterChosen(StarterChosenEvent starterChosenEvent) {
         try {
             ServerPlayer player = starterChosenEvent.getPlayer();
             Pokemon pokemon = starterChosenEvent.getPokemon();
             processTasksForTeam(pokemon, "select_starter", 1, player);
-            pokemonCatch(pokemon, player);
+            processPokemonCatch(pokemon, player);
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing starter chosen event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
     }
 
-    private Unit pokemonEvolutionComplete(EvolutionCompleteEvent evolutionCompleteEvent) {
+    private void pokemonEvolutionComplete(EvolutionCompleteEvent evolutionCompleteEvent) {
         try {
             Pokemon pokemon = evolutionCompleteEvent.getPokemon();
             ServerPlayer player = pokemon.getOwnerPlayer();
             processTasksForTeam(pokemon, "evolve_into", 1, player);
-            return pokemonCatch(pokemon, pokemon.getOwnerPlayer());
+            processPokemonCatch(pokemon, pokemon.getOwnerPlayer());
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing evolution complete event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
     }
 
-    private Unit pokemonEvolutionAccepted(EvolutionAcceptedEvent evolutionAcceptedEvent) {
+    private void pokemonEvolutionAccepted(EvolutionAcceptedEvent evolutionAcceptedEvent) {
         try {
             Pokemon pokemon = evolutionAcceptedEvent.getPokemon();
             ServerPlayer player = pokemon.getOwnerPlayer();
@@ -307,10 +301,10 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing evolution event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
-    private Unit pokemonLevelUp(LevelUpEvent levelUpEvent) {
+    private void pokemonLevelUp(LevelUpEvent levelUpEvent) {
         try {
             ServerPlayer player = levelUpEvent.getPokemon().getOwnerPlayer();
             Pokemon pokemon = levelUpEvent.getPokemon();
@@ -321,7 +315,7 @@ public class CobblemonQuestsEventHandler {
         } catch (Exception e) {
             CobblemonQuests.LOGGER.warning("Error processing level up event " + Arrays.toString(e.getStackTrace()));
         }
-        return Unit.INSTANCE;
+        return ;
     }
 
     public void processTasksForTeam(Pokemon pokemon, String action, long amount, ServerPlayer player) {

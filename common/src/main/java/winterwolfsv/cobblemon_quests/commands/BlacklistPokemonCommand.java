@@ -22,7 +22,7 @@ public class BlacklistPokemonCommand {
                         .then(Commands.argument("pokemon", StringArgumentType.string())
                                 .suggests((context, builder) -> {
                                     if (StringArgumentType.getString(context, "action").equals("add")) {
-                                        return SharedSuggestionProvider.suggest(PokemonSpecies.INSTANCE.getSpecies().stream().map(Species::getName).toList(), builder);
+                                        return SharedSuggestionProvider.suggest(PokemonSpecies.getSpecies().stream().map(Species::getName).toList(), builder);
                                     } else if (StringArgumentType.getString(context, "action").equals("remove")) {
                                         return SharedSuggestionProvider.suggest(CobblemonQuestsConfig.ignoredPokemon, builder);
                                     }

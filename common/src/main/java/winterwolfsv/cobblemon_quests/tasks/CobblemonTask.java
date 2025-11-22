@@ -47,7 +47,7 @@ import static winterwolfsv.cobblemon_quests.CobblemonQuests.MOD_ID;
 import static winterwolfsv.cobblemon_quests.tasks.TaskData.*;
 
 public class CobblemonTask extends Task {
-    public Icon pokeBallIcon = ItemIcon.getItemIcon(PokeBalls.INSTANCE.getPOKE_BALL().item());
+    public Icon pokeBallIcon = ItemIcon.getItemIcon(PokeBalls.getPokeBall().item());
     public long amount = 1L;
     public boolean shiny = false;
     public long timeMin = 0;
@@ -55,16 +55,16 @@ public class CobblemonTask extends Task {
     public int minLevel = 0;
     public int maxLevel = 0;
     public String dexProgress = "seen";
-    public ArrayList<String> actions = new ArrayList<>();
-    public ArrayList<String> biomes = new ArrayList<>();
-    public ArrayList<String> dimensions = new ArrayList<>();
-    public ArrayList<String> forms = new ArrayList<>();
-    public ArrayList<String> genders = new ArrayList<>();
-    public ArrayList<String> pokeBallsUsed = new ArrayList<>();
-    public ArrayList<String> pokemons = new ArrayList<>();
-    public ArrayList<String> pokemonTypes = new ArrayList<>();
-    public ArrayList<String> regions = new ArrayList<>();
-    public ArrayList<String> natures = new ArrayList<>();
+    public List<String> actions = new ArrayList<>();
+    public List<String> biomes = new ArrayList<>();
+    public List<String> dimensions = new ArrayList<>();
+    public List<String> forms = new ArrayList<>();
+    public List<String> genders = new ArrayList<>();
+    public List<String> pokeBallsUsed = new ArrayList<>();
+    public List<String> pokemons = new ArrayList<>();
+    public List<String> pokemonTypes = new ArrayList<>();
+    public List<String> regions = new ArrayList<>();
+    public List<String> natures = new ArrayList<>();
 
     public CobblemonTask(long id, Quest quest) {
         super(id, quest);
@@ -194,12 +194,12 @@ public class CobblemonTask extends Task {
         dexProgress = buffer.readUtf(Short.MAX_VALUE);
     }
 
-    public String writeList(ArrayList<String> list) {
+    public String writeList(List<String> list) {
         list.removeIf(Objects::isNull);
         return String.join(",", list);
     }
 
-    public ArrayList<String> readList(String s) {
+    public List<String> readList(String s) {
         return Arrays.stream(s.split(",")).map(String::trim).filter(obj -> !obj.isEmpty() && !obj.contains("choice_any")).distinct().collect(Collectors.toCollection(ArrayList::new));
     }
 
@@ -212,15 +212,15 @@ public class CobblemonTask extends Task {
         RegistryAccess registryManager = Minecraft.getInstance().level.registryAccess();
         addConfigList(config, "actions", actions, actionList, null, null);
         Function<String, String> pokemonNameProcessor = (name) -> name.replace(":", ".species.") + ".name";
-        List<String> pokemonList = PokemonSpecies.INSTANCE.getSpecies().stream().map(species -> species.resourceIdentifier.toString())
-                .sorted().collect(Collectors.toCollection(() -> new ArrayList<>(PokemonSpecies.INSTANCE.getSpecies().size() + 1)));
+        List<String> pokemonList = PokemonSpecies.getSpecies().stream().map(species -> species.resourceIdentifier.toString())
+                .sorted().collect(Collectors.toCollection(() -> new ArrayList<>(PokemonSpecies.getSpecies().size() + 1)));
         pokemonList.add("cobblemon_quests"); // Done to bypass an issue where the last pokemon cannot be selected
         addConfigList(config, "pokemons", pokemons, pokemonList, this::getPokemonIcon, pokemonNameProcessor);
         config.addLong("amount", amount, v -> amount = v, 1L, 1L, Long.MAX_VALUE).setNameKey(MOD_ID + ".task.amount");
         config.addBool("shiny", shiny, v -> shiny = v, false).setNameKey(MOD_ID + ".task.shiny");
         Function<String, String> pokeBallNameProcessor = (name) -> "item." + name.replace(":", ".");
-        List<String> pokeBallList = PokeBalls.INSTANCE.all().stream().map(pokeBall -> pokeBall.getName().toString())
-                .sorted().collect(Collectors.toCollection(() -> new ArrayList<>(PokeBalls.INSTANCE.all().size() + 1)));
+        List<String> pokeBallList = PokeBalls.all().stream().map(pokeBall -> pokeBall.getName().toString())
+                .sorted().collect(Collectors.toCollection(() -> new ArrayList<>(PokeBalls.all().size() + 1)));
         pokeBallList.add("cobblemon_quests");
         addConfigList(config, "pokeballs", pokeBallsUsed, pokeBallList, this::getIconFromIdentifier, pokeBallNameProcessor);
         addConfigList(config, "forms", forms, formList, null, null);
@@ -244,7 +244,7 @@ public class CobblemonTask extends Task {
                 .nameKey(v -> "cobblemon_quests.dex_progress." + v)
                 .create(), dexProgress).setNameKey(MOD_ID + ".task.dex_progress");
 
-        List<String> natureList = Natures.INSTANCE.all().stream().map(Nature::getDisplayName).toList();
+        List<String> natureList = Natures.all().stream().map(Nature::getDisplayName).toList();
         addConfigList(config, "natures", natures, natureList, null, s -> s);
     }
 
@@ -348,7 +348,7 @@ public class CobblemonTask extends Task {
         nbt.putString("species", pokemon.toString());
         ItemStack stack = new ItemStack(pokemonModelItem);
         PokemonItemComponent c = new PokemonItemComponent(pokemon, new HashSet<>(), new Vector4f(1, 1, 1, 1));
-        stack.set(CobblemonItemComponents.INSTANCE.getPOKEMON_ITEM(), c);
+        stack.set(CobblemonItemComponents.POKEMON_ITEM, c);
         return ItemIcon.getItemIcon(stack);
         // Command to give player pokemon model:
         // give @s cobblemon:pokemon_model[cobblemon:pokemon_item={species:"cobblemon:<pokemon_name>",aspects:[]}]
@@ -506,7 +506,7 @@ public class CobblemonTask extends Task {
                 flag = false;
             }
 
-            Species species = PokemonSpecies.INSTANCE.getByIdentifier(record);
+            Species species = PokemonSpecies.getByIdentifier(record);
             if (species == null) continue;
 
             if (!regions.isEmpty()) {
